@@ -63,48 +63,48 @@ class NeuronFiringRateObserver(nn.Module):
 
 from inspect import getframeinfo, stack
 
-class Timer:
-    def __init__(self, silent=False):
-        self.last_event = torch.cuda.Event(enable_timing=True)
-        self.last_event.record()
-        self.info_to_moving_avg = {}
-        self.silent = silent
-    def print(self, s):
-        if not self.silent:
-            print(s)
-    def log(self, info=None):
-        caller = getframeinfo(stack()[1][0])
+# class Timer:
+#     def __init__(self, silent=False):
+#         self.last_event = torch.cuda.Event(enable_timing=True)
+#         self.last_event.record()
+#         self.info_to_moving_avg = {}
+#         self.silent = silent
+#     def print(self, s):
+#         if not self.silent:
+#             print(s)
+#     def log(self, info=None):
+#         caller = getframeinfo(stack()[1][0])
 
-        # torch.cuda.synchronize()
-        now = torch.cuda.Event(enable_timing=True)
-        now.record()
-        now.synchronize()
-        # torch.cuda.synchronize()
+#         # torch.cuda.synchronize()
+#         now = torch.cuda.Event(enable_timing=True)
+#         now.record()
+#         now.synchronize()
+#         # torch.cuda.synchronize()
 
-        if info is None:
-            info = f'Line {caller.lineno}'
+#         if info is None:
+#             info = f'Line {caller.lineno}'
         
         
-        delta = self.last_event.elapsed_time(now)/1000
-        if info is not None:
-            if info not in self.info_to_moving_avg:
-                self.info_to_moving_avg[info] = delta
-                self.print(f'{info} >> current: {delta:.2E}')
-            else:
-                moving_avg = 0.9*self.info_to_moving_avg[info]+0.1*delta
-                self.info_to_moving_avg[info] = moving_avg
-                self.print(f'{info} >> current: {delta:.2e}, avg: {moving_avg:.2E}')
-        else:
-            self.print(f'current: {delta:.2E}')
-        self.last_event = now
-    def reset(self):
-        self.last_event = torch.cuda.Event(enable_timing=True)
-        self.last_event.record()
-        if not self.silent:
-            print()
-    def readout(self):
-        for info, moving_avg in self.info_to_moving_avg.items():
-            print(f'{info}: {moving_avg:.2E}')
+#         delta = self.last_event.elapsed_time(now)/1000
+#         if info is not None:
+#             if info not in self.info_to_moving_avg:
+#                 self.info_to_moving_avg[info] = delta
+#                 self.print(f'{info} >> current: {delta:.2E}')
+#             else:
+#                 moving_avg = 0.9*self.info_to_moving_avg[info]+0.1*delta
+#                 self.info_to_moving_avg[info] = moving_avg
+#                 self.print(f'{info} >> current: {delta:.2e}, avg: {moving_avg:.2E}')
+#         else:
+#             self.print(f'current: {delta:.2E}')
+#         self.last_event = now
+#     def reset(self):
+#         self.last_event = torch.cuda.Event(enable_timing=True)
+#         self.last_event.record()
+#         if not self.silent:
+#             print()
+#     def readout(self):
+#         for info, moving_avg in self.info_to_moving_avg.items():
+#             print(f'{info}: {moving_avg:.2E}')
 
 from interp_utils import see
 class LossDatapointGatherer:
@@ -314,7 +314,7 @@ class SparseMLP(nn.Module):
         self.accum_iters = accum_iters
         self.device = 'cuda'
         self.first_batch_seen = False
-        self.timer = Timer(silent=True)
+        # self.timer = Timer(silent=True)
 
         assert l1_ratio >= 1.0, 'l1_ratio must be >= 1.0'
 
@@ -356,20 +356,20 @@ class SparseMLP(nn.Module):
         pred = self.decoder(acts) + self.output_bias[None]
         return pred, acts
     def forward(self, x, y):
-        self.timer.reset()
+        # self.timer.reset()
         
         pred, acts = self.run(x, y)
-        self.timer.log()
+        # self.timer.log()
         per_eg_mse = ((pred - y)**2).mean(dim=1)
-        self.timer.log()
+        # self.timer.log()
         raw_l1 = acts.abs().mean(dim=0)
-        self.timer.log()
+        # self.timer.log()
         
         with torch.no_grad():
             perm = acts.mean(dim=0).sort(descending=False).indices            
-        self.timer.log()
+        # self.timer.log()
         l1, base_l1 = (self.l1_weights[None]*raw_l1[perm]).mean(), raw_l1.mean()
-        self.timer.log()
+        # self.timer.log()
 
         self.cycle_count += 1
 
@@ -456,7 +456,7 @@ class SparseNNMF(nn.Module):
         sparse_weights = sparse_weights/sparse_weights.mean()
         self.sparse_weights = nn.Parameter(sparse_weights, requires_grad=False)
 
-        self.timer = Timer(silent=True)
+        # self.timer = Timer(silent=True)
 
         self.norm_atoms()
 
@@ -481,10 +481,10 @@ class SparseNNMF(nn.Module):
         return pred, codes
 
     def norm_atoms(self):
-        self.timer.reset()
+        # self.timer.reset()
         with torch.no_grad():
             self.atoms.data = F.normalize(self.atoms.data, dim=1)
-        self.timer.log('atom normalization')
+        # self.timer.log('atom normalization')
     
     def train(self, train_data, n_epochs=1000, lr=1e-2, sparse_coef = 1, frozen_codes=False, frozen_atoms=False, reinit_codes=False, orthog_coef=0., mean_init=False, alt_sparse_loss=False):
         if self.bias is not None and mean_init is True:
@@ -507,29 +507,29 @@ class SparseNNMF(nn.Module):
     
         pbar = tqdm(range(n_epochs)) if not self.disable_tqdm else range(n_epochs)
         for i in pbar:
-            self.timer.reset()
+            # self.timer.reset()
             pred, codes = self(frozen_codes=frozen_codes, frozen_atoms=frozen_atoms)
-            self.timer.log('get pred, codes')
+            # self.timer.log('get pred, codes')
 
             mse_loss = F.mse_loss(pred, train_data.data)
 
             
             loss = mse_loss
 
-            self.timer.reset()
+            # self.timer.reset()
             if not frozen_codes:
-                self.timer.reset()
+                # self.timer.reset()
                 code_mean_across_batch = codes.mean(dim=0)
                 with torch.no_grad():
                     perm = code_mean_across_batch.sort(descending=True).indices
                     raw_sparse = code_mean_across_batch.mean()
 
-                self.timer.log('calculate perm')
+                # self.timer.log('calculate perm')
 
                 sparse_loss = (code_mean_across_batch[perm] * self.sparse_weights).mean()
-                self.timer.log('final sparse loss calculation')
+                # self.timer.log('final sparse loss calculation')
                 loss += sparse_coef*sparse_loss
-                self.timer.log('add sparse loss to total loss')
+                # self.timer.log('add sparse loss to total loss')
 
             
             optimizer.zero_grad()
@@ -537,7 +537,7 @@ class SparseNNMF(nn.Module):
 
             optimizer.step()
             scheduler.step()
-            self.timer.log('optimizer step')
+            # self.timer.log('optimizer step')
 
             if i % 100 == 0:
                 loss_string = f'loss: {loss.item():.1E}, mse: {mse_loss.item():.1E}'
