@@ -12,6 +12,9 @@ import numpy as np
 
 import time
 
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+
 
 def get_sparse_weights(n_atoms=2000, l1_min=4e-1, l1_max=2, sharpness=5.0):
     if l1_min == l1_max:
@@ -106,6 +109,7 @@ from inspect import getframeinfo, stack
 #         for info, moving_avg in self.info_to_moving_avg.items():
 #             print(f'{info}: {moving_avg:.2E}')
 
+
 from interp_utils import see
 class LossDatapointGatherer:
     def __init__(self):
@@ -122,7 +126,7 @@ class LossDatapointGatherer:
         self.examples.extend(batch_examples)
         self.total_observations += len(batch_losses)
     def get_examples(self):
-        return torch.cat(self.examples, dim=0).cuda()
+        return torch.cat(self.examples, dim=0).to(device)
     def sample(self, k=10):
         unnormed_probs = torch.tensor(self.losses)**2
         probs = unnormed_probs/unnormed_probs.sum()
@@ -312,7 +316,7 @@ class SparseMLP(nn.Module):
         self.l1_coef = l1_coef
         self.scheduler = get_warmup_scheduler(self.optimizer, 1000)
         self.accum_iters = accum_iters
-        self.device = 'cuda'
+        self.device = device
         self.first_batch_seen = False
         # self.timer = Timer(silent=True)
 
