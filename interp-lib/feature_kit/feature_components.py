@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import torch
 
 from transformers import AutoTokenizer
 
@@ -219,9 +220,6 @@ class Stack:
         return torch.cat(feat_outputs, dim=-1)
 
 
-
-
-
 def pred_feature(feature_acts, feats_fn, doc_ids):
     '''
     feature_acts: activations of feature inside the transformer (from sparse mlp/autoencoder)
@@ -244,5 +242,57 @@ def pred_feature(feature_acts, feats_fn, doc_ids):
     reg_weights = reg.coef_
     reg_bias = reg.intercept_
     pred = torch.tensor(reg.predict(flat_input).reshape(feature_acts.shape))
+    return reg_weights, reg_bias, pred
+
+
+def compute_weights_and_pred(X, y):
+    """
+    Computes the weights of a linear regression model and predictions based on input features.
+
+    Parameters:
+    X (torch.Tensor): The matrix of input features.
+    y (torch.Tensor): The vector of output (target) values.
+
+    The function adds a bias term to the input features, computes the weights using
+    the least squares method, and then calculates predictions based on these weights.
+
+    Returns:
+    Tuple[torch.Tensor, torch.Tensor]: A tuple containing two elements:
+        - weights (torch.Tensor): The weights of the linear regression model, including the bias term.
+        - pred (torch.Tensor): The predictions made by the model.
+    """
+    X_with_bias = torch.cat([torch.ones(X.shape[0], 1), X], dim=1)
+    weights = torch.inverse(X_with_bias.T @ X_with_bias) @ X_with_bias.T @ y
+    pred = (weights @ X_with_bias.T)
+    return weights, pred
+
+def pred_feature_fast(feature_acts, feats_fn, doc_ids):
+    """
+    Performs feature extraction and linear regression to predict feature activations.
+
+    Parameters:
+    feature_acts (torch.Tensor): Activations of features inside a transformer, such as from a sparse MLP or autoencoder.
+    feats_fn (Callable): A feature extraction function, typically a 'featurekit Stack' function.
+    doc_ids (List[List[int]]): A list of lists containing token IDs, representing a list of documents.
+
+    The function normalizes feature activations, applies the feature extraction function,
+    and uses linear regression to predict the feature activations based on the extracted features.
+
+    Returns:
+    Tuple[np.ndarray, float, torch.Tensor]: A tuple containing three elements:
+        - reg_weights (np.ndarray): The weights of the linear regression model, excluding the bias term.
+        - reg_bias (float): The bias term of the linear regression model.
+        - pred (torch.Tensor): The predictions of feature activations.
+    """
+    feature_acts = feature_acts / feature_acts.max()
+    out = feats_fn(doc_ids)
+    flat_input = out.reshape(-1, out.shape[-1])
+    flat_feature_acts = feature_acts.reshape(-1)
+    X = out.reshape(-1, out.shape[-1])
+    y = feature_acts.reshape(-1)
+    weights, pred = compute_weights_and_pred(X, y)
+    reg_weights = np.array(weights[1:])
+    reg_bias = float(weights[0])
+    pred = pred.reshape(feature_acts.shape).to(dtype=torch.float64)
     return reg_weights, reg_bias, pred
 
