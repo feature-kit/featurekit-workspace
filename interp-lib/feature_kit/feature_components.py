@@ -286,13 +286,18 @@ def pred_feature_fast(feature_acts, feats_fn, doc_ids):
     """
     feature_acts = feature_acts / feature_acts.max()
     out = feats_fn(doc_ids)
-    flat_input = out.reshape(-1, out.shape[-1])
-    flat_feature_acts = feature_acts.reshape(-1)
-    X = out.reshape(-1, out.shape[-1])
-    y = feature_acts.reshape(-1)
-    weights, pred = compute_weights_and_pred(X, y)
-    reg_weights = np.array(weights[1:])
-    reg_bias = float(weights[0])
-    pred = pred.reshape(feature_acts.shape).to(dtype=torch.float64)
+    if out.max() == out.min(): # Anything() mask
+        reg_weights = np.array([0.])
+        reg_bias = feature_acts.mean().item()
+        pred = torch.full(feature_acts.shape, reg_bias)
+    else:
+        flat_input = out.reshape(-1, out.shape[-1])
+        flat_feature_acts = feature_acts.reshape(-1)
+        X = out.reshape(-1, out.shape[-1])
+        y = feature_acts.reshape(-1)
+        weights, pred = compute_weights_and_pred(X, y)
+        reg_weights = np.array(weights[1:])
+        reg_bias = float(weights[0])
+        pred = pred.reshape(feature_acts.shape).to(dtype=torch.float64)
     return reg_weights, reg_bias, pred
 
