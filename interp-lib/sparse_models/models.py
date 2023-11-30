@@ -439,7 +439,7 @@ class SparseMLP(nn.Module):
 
 
 class SimpleSparseMLP(nn.Module):
-    def __init__(self, n_features, d_model, act=nn.ReLU, l1_ratio=1.0, l1_coef=3e-1, sharpness=5.0):
+    def __init__(self, n_features, d_model, act=nn.ReLU, l1_ratio=1.0, l1_coef=3e-1):
         super().__init__()
         self.n_features = n_features
         self.d_model = d_model
