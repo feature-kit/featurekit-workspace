@@ -1,0 +1,58 @@
+
+
+Nice rendering idea
+----
+Stack(
+    Seq(
+        Match
+
+    )
+    Match
+)
+
+
+# weights of Linear Regression currently
+[0.2, 1.0..]: number of features
+
+
+[
+    [It|He|She][ was| is]: 0.3
+    was: 0.1
+]
+
+
+class Stack
+...
+def __forward__(self, doc_batch)
+    for feat in self.features:
+        feat_output = feat(doc_batch)
+        feat_output = feat_output.reshape(*doc_batch.shape, -1)
+        # stack these up
+
+    # do linear regression here
+    ...
+
+Seq(
+    Cases(*feats)
+    are
+    grand
+)
+
+Match(*feats)
+NewCases(*feats)
+
+
+
+Prod(
+    Seq(
+        Cases(*feats)
+        are
+        grand
+    ),
+    NewCases
+)
+
+
+qk v
+q: grand
+k: are
