@@ -1,0 +1,14 @@
+mlp_F6000_S0_R1.pt filter=lfs diff=lfs merge=lfs -text
+mlp_F6000_S-1_R1.pt filter=lfs diff=lfs merge=lfs -text
+mlp_F6000_S2_R1.pt filter=lfs diff=lfs merge=lfs -text
+mlp_F6000_S-3_R1.pt filter=lfs diff=lfs merge=lfs -text
+mlp_F6000_S3_R1.pt filter=lfs diff=lfs merge=lfs -text
+mlp_F6000_S-4_R1.pt filter=lfs diff=lfs merge=lfs -text
+mlp_F6000_S4_R1.pt filter=lfs diff=lfs merge=lfs -text
+mlp_F6000_S1_R1.pt filter=lfs diff=lfs merge=lfs -text
+mlp_F6000_S-2_R1.pt filter=lfs diff=lfs merge=lfs -text
+mlp_F6000_S-5_R1.pt filter=lfs diff=lfs merge=lfs -text
+mlp_F6000_S5_R1.pt filter=lfs diff=lfs merge=lfs -text
+val_tok_ids.pt filter=lfs diff=lfs merge=lfs -text
+val_tok_strs.pt filter=lfs diff=lfs merge=lfs -text
+. filter=lfs diff=lfs merge=lfs -text
