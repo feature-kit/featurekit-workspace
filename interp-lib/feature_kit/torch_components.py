@@ -31,7 +31,7 @@ class Match(nn.Module):
         else:
             assert isinstance(match_toks[0], int) or isinstance(match_toks[0], np.int_), print(type(match_toks[0]))
         self.match_toks = torch.tensor(list(set(match_toks)))
-        self.weight = nn.Parameter(torch.tensor(torch.ones(1,)))
+        self.weight = nn.Parameter(torch.ones(1,))
     def get_feature(self, doc_ids):
         return torch.isin(doc_ids, self.match_toks).int()
     def __add__(self, match):
@@ -47,7 +47,7 @@ class And(nn.Module):
     def __init__(self, *feats):
         super().__init__()
         self.feats = preprocess_feats(feats)
-        self.weight = nn.Parameter(torch.tensor(torch.ones(1,)))
+        self.weight = nn.Parameter(torch.ones(1,))
     def get_feature(self, doc_ids):
         # feats = self.stacked(doc_ids)
         feats = torch.stack([feat.get_feature(doc_ids) for feat in self.feats], dim=-1)
@@ -93,7 +93,7 @@ class Or(nn.Module):
             feats += [total_match]
         
         self.feats = feats
-        self.weight = nn.Parameter(torch.tensor(torch.ones(1,)))
+        self.weight = nn.Parameter(torch.ones(1,))
 
     def get_feature(self, doc_ids):
         feats = torch.stack([feat.get_feature(doc_ids) for feat in self.feats], dim=-1)
@@ -137,7 +137,7 @@ class Anything(nn.Module):
     def get_feature(self, doc_ids):
         return torch.ones(doc_ids.shape).long()
     def forward(self, doc_ids):
-        return self.get_feature(doc_ids)
+        return self.get_feature(doc_ids) * self.weight
 
 
 
@@ -162,7 +162,6 @@ class Cases:
     def __call__(self, *args, **kwargs):
         assert False, 'Cases object should not be called directly. It should be an argument for a Stack or Sequence object.'
 
-
 class Optional:
     def __init__(self, feature_fn):
         self.feature_fn = feature_fn if not isinstance(feature_fn, str) else Match(feature_fn)
@@ -175,7 +174,7 @@ def a_then_b(feat_a, feat_b, optional_b=False):
     # indices that match a then b
     feat_ab = feat_a[:,:-1]*feat_b[:,1:]
     # fill in the beginning because the resultant tensor is a little too short
-    feat_ab = torch.cat((torch.zeros(feat_a.shape[0], 1).int(), res), dim=-1)
+    feat_ab = torch.cat((torch.zeros(feat_a.shape[0], 1).int(), feat_ab), dim=-1)
     # if optional_b, return OR(ab, a)
     if optional_b:
         res = (feat_ab + feat_a).clamp(max=1)
@@ -237,6 +236,8 @@ class Not:
         return torch.ones_like(doc_ids).int() - feat
     def forward(self, doc_ids):
         return self.get_feature(doc_ids)*self.weight
+    
+
     # def __repr__(self, ..)
         # child.__repr__
 
