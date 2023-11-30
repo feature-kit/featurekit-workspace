@@ -435,6 +435,85 @@ class SparseMLP(nn.Module):
     def norm_writeout(self):
         with torch.no_grad():
             self.decoder.weight.div_(torch.norm(self.decoder.weight, dim=0, keepdim=True))
+
+
+
+class SimpleSparseMLP(nn.Module):
+    def __init__(self, n_features, d_model, act=nn.ReLU, l1_ratio=1.0, l1_coef=3e-1, sharpness=5.0):
+        super().__init__()
+        self.n_features = n_features
+        self.d_model = d_model
+        self.encoder = nn.Linear(d_model, n_features)
+        self.decoder = nn.Linear(n_features, d_model, bias=False)
+        self.norm_writeout()
+
+        self.input_bias = nn.Parameter(torch.zeros(d_model))
+        self.output_bias = nn.Parameter(torch.zeros(d_model))
+        self.act = act()
+        self.l1_coef = l1_coef
+        self.first_batch_seen = False
+
+        assert l1_ratio >= 1.0, 'l1_ratio must be >= 1.0'
+
+        l1_weights = get_l1_weights(1, l1_ratio, self.n_features)
+        l1_weights = l1_weights/l1_weights.mean()
+        self.l1_weights = nn.Parameter(l1_weights, requires_grad=False)
+
+        self.l1_ratio = l1_ratio
+
+    def get_preacts(self, x):
+        return self.encoder(x - self.input_bias[None])
+    def get_acts(self, x):
+        return self.act(self.get_preacts(x))
+    def forward(self, x, return_acts=False):
+        acts = self.get_acts(x)
+        pred = self.decoder(acts) + self.output_bias[None]
+        if return_acts:
+            return pred, acts
+        return pred
+        
+    def get_losses(self, x, y):
+        if not self.first_batch_seen:
+            self.first_batch_seen = True
+            with torch.no_grad():
+                self.input_bias.data = x.mean(dim=0).data.to(self.input_bias.dtype)
+        pred, acts = self.forward(x, return_acts=True)
+
+        per_eg_mse = ((pred - y)**2).mean(dim=1)
+        raw_l1 = acts.abs().mean(dim=0)
+        
+        with torch.no_grad():
+            perm = acts.mean(dim=0).sort(descending=False).indices            
+        l1, base_l1 = (self.l1_weights[None]*raw_l1[perm]).mean(), raw_l1.mean()
+
+        mse = per_eg_mse.mean()
+        loss = mse + self.l1_coef*l1
+
+        return loss, mse, base_l1
+
+
+    def reinit_dead_neurons(self):
+        dead_neurons = self.neuron_observer.dead_neurons
+        if dead_neurons.sum() == 0:
+            print("No dead neurons to reinit")
+            return
+        else:
+            print(f"Reinitializing {dead_neurons.sum()} neurons")
+        reinit_vecs = self.loss_datapoint_gatherer.sample(k=int(dead_neurons.sum())).to(self.device) - self.input_bias[None]
+        
+        normed_reinit_vecs = reinit_vecs/torch.norm(reinit_vecs, dim=1, keepdim=True)
+
+        self.decoder.weight.data[:,dead_neurons] = normed_reinit_vecs.T
+        avg_encoder_norm = self.encoder.weight.data[~dead_neurons].norm(dim=1).mean()
+        self.encoder.weight.data[dead_neurons,:] = normed_reinit_vecs*0.2*avg_encoder_norm
+        self.encoder.bias.data[dead_neurons] = 0.0
+
+        self.optimizer = optim.Adam(self.parameters(), lr=1e-3)
+        self.scheduler = get_warmup_scheduler(self.optimizer, 400)
+    
+    def norm_writeout(self):
+        with torch.no_grad():
+            self.decoder.weight.div_(torch.norm(self.decoder.weight, dim=0, keepdim=True))
     
 
 class SparseNNMF(nn.Module):
