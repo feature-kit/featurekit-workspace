@@ -9,19 +9,58 @@
     export let tokens;
     // 2d array of weights
     export let weights;
+    export let reversed = false;
     // value to sort by per doc
-    export let per_doc_maxes;
+    // export let per_doc_vals;
+
+    let decor = (v, i) => [v, i];          // set index to value
+    let undecor = a => a[1];               // leave only index
+    let argsort = arr => arr.map(decor).sort().map(undecor);
+
+
+    let per_doc_vals = []
+
+    for (let i = 0; i < weights.length; i++) {
+        if (!reversed) {
+            per_doc_vals.push(Math.max(...weights[i]))
+        } else {
+            per_doc_vals.push(Math.min(...weights[i]))
+        }
+    }
+    console.log(per_doc_vals)
+    let perm = argsort(per_doc_vals);
+    console.log(perm)
+    if (reversed) {
+        console.log(perm[0])
+        perm.reverse();
+        console.log('reversed')
+        console.log(perm[0])
+        console.log(perm[1])
+    }
+    // perm = perm.reversed()
+    
+
+    function permute(arr, perm) {
+        let result = []
+        for (let i = 0; i < perm.length; i++) {
+            result.push(arr[perm[i]])
+        }
+        return result
+    }
+
+    tokens = permute(tokens, perm)
+    weights = permute(weights, perm)
+    per_doc_vals = permute(per_doc_vals, perm)
+
 
     let renderedDocs = [];
     let renderedWeights = [];
 
-    // import DoubleRangeSlider from './DoubleRangeSlider.svelte';
     let start = 1.0;
+    if (reversed) {
+        start = -1.0
+    }
     let end = 1.0;
-    const nice = d => {
-		if (!d && d !== 0) return '';
-		return d.toFixed(2);
-	}
 
     function shuffle(array) {
         let currentIndex = array.length,  randomIndex;
@@ -41,13 +80,7 @@
         return array;
     }
 
-    function permute(arr, perm) {
-        let result = []
-        for (let i = 0; i < perm.length; i++) {
-            result.push(arr[perm[i]])
-        }
-        return result
-    }
+    
 
     function updatePercentiles(newStart, newEnd) {
         console.log('updating percentiles')
@@ -57,8 +90,13 @@
         let endIdx = tokens.length-1;
 
         for (let i = 0; i < tokens.length-20; i++) {
-            if (per_doc_maxes[i] > start) {
+
+            if (!reversed && per_doc_vals[i] > start ) {
                 startIdx = i;
+                break;
+            }
+            if (reversed && per_doc_vals[i] < start) {
+                startIdx =i;
                 break;
             }
         }
@@ -104,7 +142,7 @@
 <div class="weighted-docs">
     <div class="slider">
         <div>
-            <input type="range" min="0" max="1" step="0.01" bind:value={start} on:input={handleInputChange} on:change={handleChange}/>
+            <input type="range" min="-1" max="1" step="0.02" bind:value={start} on:input={handleInputChange} on:change={handleChange}/>{start}
         </div>
     </div>
     

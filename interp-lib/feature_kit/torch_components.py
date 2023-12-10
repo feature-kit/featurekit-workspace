@@ -20,8 +20,16 @@ def enc(*s):
     return toks
 
 def preprocess_feats(feats, allow_nones=False):
-    return [Match(feat) if isinstance(feat, str) else feat for feat in feats if (feat is not None or allow_nones)]
+    return nn.ModuleList([Match(feat) if isinstance(feat, str) else feat for feat in feats if (feat is not None or allow_nones)])
 
+class FeatureModule(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.device = None
+    
+    def to(self, device):
+        self.device = device
+        return super().to(device)
 
 class Match(nn.Module):
     def __init__(self, *match_toks):
@@ -30,7 +38,7 @@ class Match(nn.Module):
             match_toks = enc(*match_toks)
         else:
             assert isinstance(match_toks[0], int) or isinstance(match_toks[0], np.int_), print(type(match_toks[0]))
-        self.match_toks = torch.tensor(list(set(match_toks)))
+        self.match_toks = nn.Parameter(torch.tensor(list(set(match_toks))), requires_grad=False)
         self.weight = nn.Parameter(torch.ones(1,))
     def get_feature(self, doc_ids):
         return torch.isin(doc_ids, self.match_toks).int()
@@ -41,12 +49,19 @@ class Match(nn.Module):
     def forward(self, doc_ids):
         matches = self.get_feature(doc_ids)
         return matches*self.weight
-    
+    def __str__(self):
+        res =  '['+','.join([tokenizer.decode(tok_id) for tok_id in self.match_toks[:3].tolist()])
+        if len(self.match_toks) > 3:
+            res += '...'
+        res += ']'
+        return res
+    def __repr__(self):
+        return str(self) + f': {self.weight.item():.2f}'
 
 class And(nn.Module):
     def __init__(self, *feats):
         super().__init__()
-        self.feats = preprocess_feats(feats)
+        self.feats = nn.ModuleList(preprocess_feats(feats))
         self.weight = nn.Parameter(torch.ones(1,))
     def get_feature(self, doc_ids):
         # feats = self.stacked(doc_ids)
@@ -61,7 +76,7 @@ class And(nn.Module):
 class Prod(nn.Module):
     def __init__(self, *feats):
         super().__init__()
-        self.feats = preprocess_feats(feats)
+        self.feats = nn.ModuleList(preprocess_feats(feats))
     def forward(self, doc_ids):
         feats = torch.stack([feat(doc_ids) for feat in self.feats], dim=-1)
         res = torch.prod(feats, dim=-1)
@@ -71,7 +86,7 @@ class Prod(nn.Module):
 class Sum(nn.Module):
     def __init__(self, *feats):
         super().__init__()
-        self.feats = preprocess_feats(feats)
+        self.feats = nn.ModuleList(preprocess_feats(feats))
     def forward(self, doc_ids):
         feats = torch.stack([feat(doc_ids) for feat in self.feats], dim=-1)
         res = torch.sum(feats, dim=-1)
@@ -92,7 +107,7 @@ class Or(nn.Module):
                 total_match += match
             feats += [total_match]
         
-        self.feats = feats
+        self.feats = nn.ModuleList(feats)
         self.weight = nn.Parameter(torch.ones(1,))
 
     def get_feature(self, doc_ids):
@@ -135,7 +150,7 @@ class Anything(nn.Module):
         super().__init__()
         self.weight = nn.Parameter(torch.ones(1,))
     def get_feature(self, doc_ids):
-        return torch.ones(doc_ids.shape).long()
+        return torch.ones(doc_ids.shape).long().to(doc_ids.device)
     def forward(self, doc_ids):
         return self.get_feature(doc_ids) * self.weight
 
@@ -155,14 +170,14 @@ def find_duplicates(l):
         l = tail
     return dupes
 
-class Cases:
+class Cases(nn.Module):
     def __init__(self, *feats):
         assert len(set(feats)) == len(feats), f'Each case entry should be unique. Duplicates: {find_duplicates(feats)}'
-        self.feats = preprocess_feats(feats, allow_nones=True)
+        self.feats = nn.ModuleList(preprocess_feats(feats, allow_nones=True))
     def __call__(self, *args, **kwargs):
         assert False, 'Cases object should not be called directly. It should be an argument for a Stack or Sequence object.'
 
-class Optional:
+class Optional(nn.Module):
     def __init__(self, feature_fn):
         self.feature_fn = feature_fn if not isinstance(feature_fn, str) else Match(feature_fn)
     def __call__(self, doc_ids):
@@ -174,7 +189,7 @@ def a_then_b(feat_a, feat_b, optional_b=False):
     # indices that match a then b
     feat_ab = feat_a[:,:-1]*feat_b[:,1:]
     # fill in the beginning because the resultant tensor is a little too short
-    feat_ab = torch.cat((torch.zeros(feat_a.shape[0], 1).int(), feat_ab), dim=-1)
+    feat_ab = torch.cat((torch.zeros(feat_a.shape[0], 1).int().to(feat_ab.device), feat_ab), dim=-1)
     # if optional_b, return OR(ab, a)
     if optional_b:
         res = (feat_ab + feat_a).clamp(max=1)
@@ -192,7 +207,7 @@ class Seq(nn.Module):
                 final_feats.extend(feat.feats)
             else:
                 final_feats.append(feat)
-        self.feats = final_feats
+        self.feats = nn.ModuleList(final_feats)
         self.weight = nn.Parameter(torch.ones(1,))
     
     def __new__(cls, *feats, **kwargs):
@@ -207,12 +222,14 @@ class Seq(nn.Module):
                 )
         instance = super().__new__(cls)
         return instance
+    def __repr__(self):
+        return 'Seq(\n  '+'\n  '.join([str(feat) for feat in self.feats])+f'\n): {self.weight.item():.1f}'
     
     def get_feature(self, doc_ids):
         if isinstance(self.feats[0], Optional):
             assert False, 'An Optional feature cannot be the first part of a sequence.'
         assert len(doc_ids.shape) == 2
-        feats = torch.stack([feat(doc_ids) for feat in self.feats], dim=-1)
+        feats = torch.stack([feat.get_feature(doc_ids) for feat in self.feats], dim=-1)
 
         # in parallel: does this token match the first token of the sequence
         valid_start = feats[:,:,0]
@@ -227,7 +244,7 @@ class Seq(nn.Module):
         return self.get_feature(doc_ids)*self.weight
 
 
-class Not:
+class Not(nn.Module):
     def __init__(self, feat):
         self.not_feat = preprocess_feats([feat])[0]
         self.weight = nn.Parameter(torch.ones(1,))
