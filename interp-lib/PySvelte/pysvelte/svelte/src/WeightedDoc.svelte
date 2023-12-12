@@ -41,11 +41,14 @@
         /* padding: 0rem; */
     }
     .token {
-        border:0.3px solid black;
-        padding:0.3px;
+        border:0px solid black;
+        padding:0px;
         font-size: larger;
         position: relative;
         cursor: default;
+        margin-left: -0.15rem;
+        margin-left: -0.15rem;
+        color: white;
     }
     .token:hover {
         background-color:rgba(135,206,250,1);

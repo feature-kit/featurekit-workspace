@@ -16,7 +16,6 @@
     "glob": "^7.1.6",
     "html-webpack-plugin": "^4.5.1",
     "svelte-loader": "github:sveltejs/svelte-loader",
-    "svelte-range-slider-pips": "^2.2.3",
     "webpack": "^5.16.0",
     "webpack-cli": "^4.4.0",
     "webpack-dev-server": "^3.11.2"
@@ -25,8 +24,8 @@
     "buffer": "^6.0.3",
     "d3": "^7.0.0",
     "d3-geo": "^2.0.1",
-    "d3-scale": "^3.2.3",
-    "d3-scale-chromatic": "^2.0.0",
+    "d3-scale": "^4.0.2",
+    "d3-scale-chromatic": "^3.0.0",
     "esbuild-loader": "^2.20.0",
     "ndarray": "^1.0.19",
     "ndarray-ops": "^1.2.2",
@@ -35,7 +34,7 @@
     "numpy-parser": "^1.2.3",
     "pako": "^2.0.3",
     "path": "^0.12.7",
-    "svelte": "^3.39.0",
+    "svelte": "^3.31.2",
     "yootils": "^0.3.1"
   }
 }

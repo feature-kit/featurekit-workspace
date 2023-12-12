@@ -1,169 +1,142 @@
 <script>
-    function clamp(num, min, max) {
-		return num < min ? min : num > max ? max : num;
-	}
-
-    import WeightedDoc from './WeightedDoc.svelte';
-
-    // 2d array of tokens
-    export let tokens;
-    // 2d array of weights
-    export let weights;
-    export let reversed = false;
-    // value to sort by per doc
-    // export let per_doc_vals;
+    import WeightedDoc from './WeightedDoc.svelte'
+    import WeightedDocsControl from './components/WeightedDocsControl.svelte'
+	
+    // import docs from './docs.json';
+    // import acts from './feature_acts.json';
+   
+    export let docs;
+    export let acts;
+    
 
     let decor = (v, i) => [v, i];          // set index to value
     let undecor = a => a[1];               // leave only index
     let argsort = arr => arr.map(decor).sort().map(undecor);
+    
+    let aggrs = {}
+    let aggrPerms = {}
 
 
-    let per_doc_vals = []
+    aggrs['max'] = acts.map((feats) => Math.max(...feats))
+    aggrPerms['max'] = argsort(aggrs['max'])
+    aggrs['max'] = aggrs['max'].toSorted()
 
-    for (let i = 0; i < weights.length; i++) {
-        if (!reversed) {
-            per_doc_vals.push(Math.max(...weights[i]))
+    aggrs['min'] = acts.map((feats) => Math.min(...feats))
+    aggrPerms['min'] = argsort(aggrs['min'])
+    aggrs['min'] = aggrs['min'].toSorted()
+
+    aggrs['mean'] = acts.map((feats) => feats.reduce((a, b) => a + b, 0) / feats.length)
+    aggrPerms['mean'] = argsort(aggrs['mean'])
+    aggrs['mean'] = aggrs['mean'].toSorted()
+
+    // let docs_ = docs.slice(0,20)
+    // let acts_ = acts.slice(0,20)
+    // let aggrMax = aggrMax.slice(0,20)
+
+    let aggr = 'max'
+    let thresholdOrPercentile = 'threshold'
+    let ordering = 'descend';
+
+    
+
+    // let aggrMaxPerm = argsort(aggrMax)
+    // let aggrMaxSorted = aggrMax.toSorted()
+
+    function getRandomInts(rangeStart, rangeEnd, count) {
+        // Create an array with numbers from rangeStart to rangeEnd
+        let numbers = [];
+        for (let i = rangeStart; i < rangeEnd; i++) {
+            numbers.push(i);
+        }
+
+        // Shuffle the array
+        for (let i = numbers.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [numbers[i], numbers[j]] = [numbers[j], numbers[i]]; // Swap elements
+        }
+
+        // Return the first 'count' elements
+        return numbers.slice(0, count);
+    }
+
+    // export let thresholdMin = Math.min(...acts.map(r=>Math.min(...r)))-1
+    // export let thresholdMax = Math.max(...acts.map(r=>Math.max(...r)))*2
+    let thresholdMin=0
+    let thresholdMax=1
+
+    export let start = thresholdMin;
+    export let end = thresholdMax;
+
+    export let k = 10;
+
+    let getDocBounds = () => {
+        let startBound, endBound;
+        if (thresholdOrPercentile == 'threshold') {
+            for (var i = 0; i <= Math.max(docs.length-k, 0); i++) {
+                if (aggrs[aggr][i] >= start) {
+                    break; 
+                }
+            }
+            startBound = i;
+
+            for (var j = aggrs[aggr].length; j >= startBound+k; j--) {
+                if (aggrs[aggr][j-1] <= end && aggrs[aggr][j-1] >= start) {
+                    break;
+                }
+            }
+            endBound = j;
         } else {
-            per_doc_vals.push(Math.min(...weights[i]))
+            // percentile
+            startBound = Math.min(Math.floor(aggrs[aggr].length * start), aggrs[aggr].length-k);
+            endBound = Math.max(Math.ceil(aggrs[aggr].length * end), k)
+            console.log(startBound, endBound)
         }
-    }
-    console.log(per_doc_vals)
-    let perm = argsort(per_doc_vals);
-    console.log(perm)
-    if (reversed) {
-        console.log(perm[0])
-        perm.reverse();
-        console.log('reversed')
-        console.log(perm[0])
-        console.log(perm[1])
-    }
-    // perm = perm.reversed()
+        return [startBound, endBound];
+    };
     
 
-    function permute(arr, perm) {
-        let result = []
-        for (let i = 0; i < perm.length; i++) {
-            result.push(arr[perm[i]])
+    let getDocIndices = () => {
+        let [startBound, endBound] = getDocBounds()
+        console.log([startBound, endBound])
+        let indices = getRandomInts(startBound, endBound, k)
+        if (ordering == 'ascend') {
+            indices.sort()
+        } else if (ordering == 'descend') {
+            indices.sort((a,b) => b-a)
+        } else {
+            // nothing
         }
-        return result
+        return indices.map(i => aggrPerms[aggr][i])
     }
 
-    tokens = permute(tokens, perm)
-    weights = permute(weights, perm)
-    per_doc_vals = permute(per_doc_vals, perm)
-
-
-    let renderedDocs = [];
-    let renderedWeights = [];
-
-    let start = 1.0;
-    if (reversed) {
-        start = -1.0
-    }
-    let end = 1.0;
-
-    function shuffle(array) {
-        let currentIndex = array.length,  randomIndex;
-
-        // While there remain elements to shuffle.
-        while (currentIndex > 0) {
-
-            // Pick a remaining element.
-            randomIndex = Math.floor(Math.random() * currentIndex);
-            currentIndex--;
-
-            // And swap it with the current element.
-            [array[currentIndex], array[randomIndex]] = [
-            array[randomIndex], array[currentIndex]];
+    let renderedDocIndices;
+    let resampleDocs = () => {
+        if (thresholdOrPercentile == 'percentile') {
+            start = Math.max(start, 0)
+            end = Math.min(1, end)
         }
-
-        return array;
+        renderedDocIndices = getDocIndices()
+        console.log(renderedDocIndices)
     }
 
     
-
-    function updatePercentiles(newStart, newEnd) {
-        console.log('updating percentiles')
-
-
-        let startIdx = clamp(tokens.length - 1 - 20, 0, tokens.length-1);
-        let endIdx = tokens.length-1;
-
-        for (let i = 0; i < tokens.length-20; i++) {
-
-            if (!reversed && per_doc_vals[i] > start ) {
-                startIdx = i;
-                break;
-            }
-            if (reversed && per_doc_vals[i] < start) {
-                startIdx =i;
-                break;
-            }
-        }
-
-        let tempDocs = []
-        let tempWeights = []
-
-        let stepSize = clamp(Math.round((endIdx-startIdx)/20), 1, endIdx-startIdx)
-
-        for (let i = startIdx; i < endIdx; i += stepSize) {
-            tempDocs.push(tokens[i])
-            tempWeights.push(weights[i])
-        }
-
-        // shuffle the arrays
-        let perm = []
-        for (let i = 0; i < tempDocs.length; i++) {
-            perm.push(i)
-        }
-        perm = shuffle(perm)
-        tempDocs = permute(tempDocs, perm)
-        tempWeights = permute(tempWeights, perm)
-
-        renderedDocs = [...tempDocs]
-        renderedWeights = [...tempWeights]
-
+    $: {
+        thresholdOrPercentile; start; end; ordering;
+        resampleDocs()
     }
 
-    function handleInputChange(event) {
-        start = event.target.value;
+    $: {
+        console.log('tick')
+        thresholdMin = aggrs[aggr][0]
+        {console.log(docs)}
+        thresholdMax = aggrs[aggr][docs.length - 1]
+        console.log(thresholdMin)
     }
-
-    function handleChange() {
-        updatePercentiles(start, end);
-        console.log(renderedDocs[0])
-        console.log('should be done')
-    }
-    
-    updatePercentiles(start, end);
 </script>
 
-
-<div class="weighted-docs">
-    <div class="slider">
-        <div>
-            <input type="range" min="-1" max="1" step="0.02" bind:value={start} on:input={handleInputChange} on:change={handleChange}/>{start}
-        </div>
-    </div>
-    
-    {#each renderedDocs as doc, i}
-        <div class="doc">
-            <WeightedDoc tokens={doc} weights={renderedWeights[i]} />
-        </div>
-    {/each}
-</div>
-
-<style>
-    .weighted-docs {
-        background: #1b1a1a;
-        color: rgb(197, 193, 187);
-        padding: 2rem;
-    }
-    .slider{
-        padding: 2rem;
-        width: 60%;
-	}
-    .doc {
-        margin: 1rem;
-    }
-</style>
+<main>
+    <WeightedDocsControl thresholdMax={thresholdMax} thresholdMin={thresholdMin} bind:start={start} bind:end={end} bind:thresholdOrPercentile={thresholdOrPercentile} bind:aggregation={aggr} bind:ordering={ordering} resampleDocs={resampleDocs}/>
+        {#each renderedDocIndices as i}
+            <WeightedDoc tokens={docs[i]} weights={acts[i]}/>
+        {/each}
+</main>
