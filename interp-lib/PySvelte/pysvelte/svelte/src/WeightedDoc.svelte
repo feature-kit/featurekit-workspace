@@ -29,7 +29,8 @@
 <div>
     
     {#each zipped as [tok, weight]}
-        <span class="token" style="{getStyle(weight)}">{tok}
+        <span class={"token"+ (tok[0] !== '⋅' ? " specialTok" : "")} style="{getStyle(weight)}">{tok}
+            
             <span class="hovertext">{nice(weight)}</span>
         </span>
     {/each}
@@ -42,17 +43,30 @@
     }
     .token {
         border:0px solid black;
+        /* border-left: 1px solid white; */
+        /* border-right: 1px solid white; */
         padding:0px;
         font-size: larger;
         position: relative;
         cursor: default;
-        margin-left: -0.15rem;
-        margin-left: -0.15rem;
+        padding-right: -0.2rem;
         color: white;
     }
+
+    
     .token:hover {
         background-color:rgba(135,206,250,1);
     }
+
+    .specialTok {
+        border-left: 1px solid white;
+        border-right: 1px solid white;
+    }
+
+    .specialTok + .specialTok {
+        border-left: 0 none;
+    }
+
     .token .hovertext {
         display: none;
         position: absolute;

@@ -140,3 +140,9 @@
             <WeightedDoc tokens={docs[i]} weights={acts[i]}/>
         {/each}
 </main>
+
+<style>
+    main {
+        background-color: black;
+    }
+</style>
