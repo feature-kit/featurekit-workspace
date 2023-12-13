@@ -1,0 +1,7 @@
+nouns.json filter=lfs diff=lfs merge=lfs -text
+plural_nouns.json filter=lfs diff=lfs merge=lfs -text
+superlative_adjective.json filter=lfs diff=lfs merge=lfs -text
+water_words.json filter=lfs diff=lfs merge=lfs -text
+adjectives.json filter=lfs diff=lfs merge=lfs -text
+comparative_adjectives.json filter=lfs diff=lfs merge=lfs -text
+inanimate_objects.json filter=lfs diff=lfs merge=lfs -text
