@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
+from tok_labelling import load_tok_label
+
 from transformers import AutoTokenizer
 
 from sklearn.linear_model import LinearRegression
@@ -32,14 +34,26 @@ class FeatureModule(nn.Module):
         return super().to(device)
 
 class Match(nn.Module):
-    def __init__(self, *match_toks):
+    def __init__(self, *match_toks, **kwargs):
         super().__init__()
+        self.label = False
+    
+        if 'tok_label' in kwargs:
+            assert len(match_toks) == 0, 'If using tok_label arg, no other arguments can be provided to Match'
+            assert len(kwargs) == 1, 'kwargs should only have 1 element in Match if using tok_label argument'
+            match_toks = load_tok_label(kwargs['tok_label'])
+            self.label = kwargs['tok_label']
+        if 'label' in kwargs:
+            self.label = kwargs['label']
+
         if isinstance(match_toks[0], str):
             match_toks = enc(*match_toks)
         else:
             assert isinstance(match_toks[0], int) or isinstance(match_toks[0], np.int_), print(type(match_toks[0]))
         self.match_toks = nn.Parameter(torch.tensor(list(set(match_toks))), requires_grad=False)
         self.weight = nn.Parameter(torch.ones(1,))
+        
+
     def get_feature(self, doc_ids):
         return torch.isin(doc_ids, self.match_toks).int()
     def __add__(self, match):
@@ -50,11 +64,14 @@ class Match(nn.Module):
         matches = self.get_feature(doc_ids)
         return matches*self.weight
     def __str__(self):
-        res =  '['+','.join([tokenizer.decode(tok_id) for tok_id in self.match_toks[:3].tolist()])
-        if len(self.match_toks) > 3:
-            res += '...'
-        res += ']'
-        return res
+        if self.label is False:
+            res =  '['+','.join([tokenizer.decode(tok_id) for tok_id in self.match_toks[:3].tolist()])
+            if len(self.match_toks) > 3:
+                res += '...'
+            res += ']'
+            return res
+        else:
+            return self.label
     def __repr__(self):
         return str(self) + f': {self.weight.item():.2f}'
 
@@ -117,12 +134,13 @@ class Or(nn.Module):
     def forward(self, doc_ids):
         return self.get_feature(doc_ids)*self.weight
 
-# def ElasticInterval(k):
-#     return Seq(
-#         *[
-#             Optional(Anything()) for _ in range(k)
-#         ]
-#     )
+def ElasticInterval(k):
+    return Seq(
+        *[
+            Optional(Anything()) for _ in range(k)
+        ]
+    )
+
 
 # def FixedInterval(k):
 #     assert k > 0
@@ -172,6 +190,7 @@ def find_duplicates(l):
 
 class Cases(nn.Module):
     def __init__(self, *feats):
+        super().__init__()
         assert len(set(feats)) == len(feats), f'Each case entry should be unique. Duplicates: {find_duplicates(feats)}'
         self.feats = nn.ModuleList(preprocess_feats(feats, allow_nones=True))
     def __call__(self, *args, **kwargs):
@@ -179,9 +198,12 @@ class Cases(nn.Module):
 
 class Optional(nn.Module):
     def __init__(self, feature_fn):
+        super().__init__()
         self.feature_fn = feature_fn if not isinstance(feature_fn, str) else Match(feature_fn)
-    def __call__(self, doc_ids):
+    def get_feature(self, doc_ids):
         return self.feature_fn(doc_ids)
+    def __call__(self, doc_ids):
+        return self.get_feature(doc_ids)
     
 def a_then_b(feat_a, feat_b, optional_b=False):
     assert len(feat_a.shape) == 2
@@ -223,7 +245,21 @@ class Seq(nn.Module):
         instance = super().__new__(cls)
         return instance
     def __repr__(self):
-        return 'Seq(\n  '+'\n  '.join([str(feat) for feat in self.feats])+f'\n): {self.weight.item():.1f}'
+        feat_reprs = []
+        interval_count = 0
+        for feat in self.feats:
+            if isinstance(feat, Optional) and isinstance(feat.feature_fn, Anything):
+                interval_count += 1
+            else:
+                if interval_count >= 1:
+                    feat_reprs.append(f'ElasticInterval({interval_count})')
+                    interval_count = 0
+                feat_reprs.append(str(feat))
+        if interval_count >= 1:
+            feat_reprs.append(f'ElasticInterval({interval_count})')
+            interval_count = 0
+
+        return 'Seq(\n  '+'\n  '.join(feat_reprs)+f'\n): {self.weight.item():.1f}'
     
     def get_feature(self, doc_ids):
         if isinstance(self.feats[0], Optional):

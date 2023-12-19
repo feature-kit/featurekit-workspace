@@ -140,8 +140,10 @@ def new_tok_label(label, description, batch_size=50, model='gpt-4'):
 
 import os
 
-def load_tok_label(label):
+def load_tok_label(label=''):
     available_labels = [item.split('.')[0] for item in os.listdir(local_fname('tok_labels')) if item.split('.')[1] == 'json']
+    if label == '':
+        print(f'No label provided. Available tok labels are: {available_labels}')
     if label not in available_labels:
         print(f'tok label "{label}" not found. Available tok labels are: {available_labels}')
     else:

@@ -29,6 +29,21 @@
     aggrPerms['mean'] = argsort(aggrs['mean'])
     aggrs['mean'] = aggrs['mean'].toSorted()
 
+    let absfeats;
+    aggrs['absmax'] = acts.map((feats) => {
+            absfeats = feats.map(feat => Math.abs(feat))
+            return Math.max(...absfeats)
+        })
+    aggrPerms['absmax'] = argsort(aggrs['absmax'])
+    aggrs['absmax'] = aggrs['absmax'].toSorted()
+
+    aggrs['absmean'] = acts.map((feats) => {
+            absfeats = feats.map((feat) => Math.abs(feat))
+            return absfeats.reduce((a, b) => a + b, 0) / absfeats.length
+        })
+    aggrPerms['absmean'] = argsort(aggrs['absmean'])
+    aggrs['absmean'] = aggrs['absmean'].toSorted()
+
     // let docs_ = docs.slice(0,20)
     // let acts_ = acts.slice(0,20)
     // let aggrMax = aggrMax.slice(0,20)
@@ -127,9 +142,9 @@
 
     $: {
         console.log('tick')
-        thresholdMin = aggrs[aggr][0]
+        thresholdMin = Math.min(...aggrs[aggr])
         {console.log(docs)}
-        thresholdMax = aggrs[aggr][docs.length - 1]
+        thresholdMax = Math.max(...aggrs[aggr])//[docs.length - 1]
         console.log(thresholdMin)
     }
 </script>
@@ -144,5 +159,6 @@
 <style>
     main {
         background-color: black;
+        font: sans-serif;
     }
 </style>

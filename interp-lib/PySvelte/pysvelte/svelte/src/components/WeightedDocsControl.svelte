@@ -22,7 +22,7 @@
 <div class='menu'>
 	<DoubleSlider min={(thresholdOrPercentile == 'percentile') ? 0 : thresholdMin} max={(thresholdOrPercentile == 'percentile') ? 1 : thresholdMax} bind:start bind:end/>
 	<div class='interface'>
-		<LabeledSelector options={['max', 'mean', 'min']} title='aggregation' bind:selection={aggregation}/>
+		<LabeledSelector options={['max', 'mean', 'min', 'absmax', 'absmean']} title='aggregation' bind:selection={aggregation}/>
 		<LabeledSelector options={['threshold', 'percentile']} title='slider type' bind:selection={thresholdOrPercentile}/>
 		<LabeledSelector options={['descend','ascend', 'random']} title='sort' bind:selection={ordering}/>
 		<div>

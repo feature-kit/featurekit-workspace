@@ -461,10 +461,17 @@ class SimpleSparseMLP(nn.Module):
 
         self.l1_ratio = l1_ratio
 
-    def get_preacts(self, x):
-        return self.encoder(x - self.input_bias[None])
-    def get_acts(self, x):
-        return self.act(self.get_preacts(x))
+    def get_preacts(self, x, indices=None):
+        if indices is not None:
+            if isinstance(indices, int):
+                indices = slice(indices, indices+1)
+            if isinstance(indices, slice):
+                indices = [indices]
+            return (x - self.input_bias[None]) @ self.encoder.weight[*indices].T + self.encoder.bias[*indices][None]
+        else:
+            return self.encoder(x - self.input_bias[None])
+    def get_acts(self, x, indices=None):
+        return self.act(self.get_preacts(x, indices=indices))
     def forward(self, x, return_acts=False):
         acts = self.get_acts(x)
         pred = self.decoder(acts) + self.output_bias[None]

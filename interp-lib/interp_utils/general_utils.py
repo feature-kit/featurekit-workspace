@@ -5,12 +5,14 @@ import numpy as np
 from typing import Union, List
 
 
-def get_scheduler(optimizer, n_steps):
+def get_scheduler(optimizer, n_steps, end_lr_factor=0.1, n_warmup_steps=None):
+    if n_warmup_steps is None:
+        n_warmup_steps = 0.05*n_steps
     def lr_lambda(step):
-        if step < 0.05 * n_steps:
-            return step / (0.05 * n_steps)
+        if step < n_warmup_steps:
+            return (step / n_warmup_steps)
         else:
-            return 1 - (step - 0.05 * n_steps) / (n_steps - 0.05 * n_steps + 1e-3)
+            return 1 - (1-end_lr_factor) * (step - n_warmup_steps) / (n_steps - n_warmup_steps + 1e-3)
 
     return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)
 

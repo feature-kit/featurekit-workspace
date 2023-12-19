@@ -1,8 +1,11 @@
 from transformers import AutoTokenizer
 import numpy as np
 import torch
+import os
 
-ngram_counts = torch.load('./ngram_counts_3.pt')
+current_file = '/'.join(__file__.split('/')[:-1])
+
+ngram_counts = torch.load(f'{current_file}/ngram_counts_3.pt')
 
 tokenizer = AutoTokenizer.from_pretrained('roneneldan/TinyStories')
 
