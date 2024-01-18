@@ -1,1 +1,5 @@
 mlp_F6000_clipped.pt filter=lfs diff=lfs merge=lfs -text
+mlp_F20000_S5_R1_LR-10_L2.pt filter=lfs diff=lfs merge=lfs -text
+mlp_F20000_S6_R1_LR-10_L0.pt filter=lfs diff=lfs merge=lfs -text
+mlp_F20000_S6_R1_LR-10_L3.pt filter=lfs diff=lfs merge=lfs -text
+mlp_F20000_S5_R1_LR-10_L1.pt filter=lfs diff=lfs merge=lfs -text
